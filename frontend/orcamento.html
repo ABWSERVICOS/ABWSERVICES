@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Solicitar Orçamento | Nome da Sua Empresa</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark"></span>
+          <span>Nome da Sua Empresa</span>
+        </a>
+        <div class="actions">
+          <a class="btn btn-ghost" href="/">Voltar ao Site</a>
+          <a class="btn btn-primary" href="/admin.html">Área Admin</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <div class="container">
+        <div class="section-head">
+          <h1>Solicitar Orçamento</h1>
+          <p>
+            Preencha os dados abaixo e nossa equipe retorna com a proposta.
+          </p>
+        </div>
+
+        <section class="panel">
+          <form id="form-orcamento" class="form-grid">
+            <div>
+              <label for="nome">Nome completo</label>
+              <input type="text" id="nome" required />
+            </div>
+            <div>
+              <label for="endereco">Endereço</label>
+              <input type="text" id="endereco" required />
+            </div>
+            <div>
+              <label for="descricao">Descreva o serviço</label>
+              <textarea id="descricao" required></textarea>
+            </div>
+            <button class="btn btn-primary" type="submit">Enviar Solicitação</button>
+            <p id="feedback" class="feedback"></p>
+          </form>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const form = document.getElementById("form-orcamento");
+      const feedback = document.getElementById("feedback");
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        feedback.textContent = "Enviando solicitação...";
+        feedback.className = "feedback";
+
+        const data = {
+          nome: document.getElementById("nome").value.trim(),
+          endereco: document.getElementById("endereco").value.trim(),
+          descricao: document.getElementById("descricao").value.trim(),
+        };
+
+        try {
+          const response = await fetch("/pedidos", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(data),
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.message || "Falha no envio");
+          }
+
+          form.reset();
+          feedback.textContent = result.mensagem || "Solicitação enviada com sucesso.";
+          feedback.className = "feedback ok";
+        } catch (error) {
+          feedback.textContent = `Erro: ${error.message}`;
+          feedback.className = "feedback error";
+        }
+      });
+    </script>
+  </body>
+</html>

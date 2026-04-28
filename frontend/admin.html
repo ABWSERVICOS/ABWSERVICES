@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin ABW | Alexandre Bach Weber</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-mark"></span>
+          <span>Painel do Alexandre</span>
+        </a>
+        <div class="actions">
+          <a class="btn btn-ghost" href="/">Voltar ao Site</a>
+          <button id="logout-btn" class="btn btn-primary hidden" type="button">Sair</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-shell">
+      <div class="container">
+        <section class="panel" id="login-panel">
+          <h2>Login Restrito</h2>
+          <p class="helper">
+            Apenas o administrador principal tem acesso a este painel.
+          </p>
+          <form id="login-form" class="form-grid">
+            <div>
+              <label for="email">Email do administrador</label>
+              <input type="email" id="email" required />
+            </div>
+            <div>
+              <label for="senha">Senha</label>
+              <input type="password" id="senha" required />
+            </div>
+            <button class="btn btn-primary" type="submit">Entrar no painel</button>
+            <p id="login-feedback" class="feedback"></p>
+          </form>
+        </section>
+
+        <section class="hidden" id="dashboard-panel">
+          <div class="method-grid">
+            <article class="method-card">
+              <h3>Pedidos Pendentes</h3>
+              <p id="count-pendentes">0</p>
+            </article>
+            <article class="method-card">
+              <h3>Pedidos Realizados</h3>
+              <p id="count-realizados">0</p>
+            </article>
+            <article class="method-card">
+              <h3>Total</h3>
+              <p id="count-total">0</p>
+            </article>
+          </div>
+
+          <section class="panel">
+            <div class="actions">
+              <button id="tab-pendentes" class="btn btn-primary" type="button">Pendentes</button>
+              <button id="tab-realizados" class="btn btn-ghost" type="button">Realizados</button>
+              <button id="tab-todos" class="btn btn-ghost" type="button">Todos</button>
+            </div>
+            <p id="orders-feedback" class="feedback"></p>
+            <div id="order-list" class="order-list"></div>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const TOKEN_KEY = "adminToken";
+      let activeFilter = "pendente";
+      let allOrders = [];
+
+      const loginPanel = document.getElementById("login-panel");
+      const dashboardPanel = document.getElementById("dashboard-panel");
+      const logoutBtn = document.getElementById("logout-btn");
+      const loginForm = document.getElementById("login-form");
+      const loginFeedback = document.getElementById("login-feedback");
+      const ordersFeedback = document.getElementById("orders-feedback");
+      const orderList = document.getElementById("order-list");
+
+      const tabPendentes = document.getElementById("tab-pendentes");
+      const tabRealizados = document.getElementById("tab-realizados");
+      const tabTodos = document.getElementById("tab-todos");
+
+      function setLoggedState(isLogged) {
+        loginPanel.classList.toggle("hidden", isLogged);
+        dashboardPanel.classList.toggle("hidden", !isLogged);
+        logoutBtn.classList.toggle("hidden", !isLogged);
+      }
+
+      function formatDate(dateValue) {
+        if (!dateValue) return "Sem data";
+        const date = new Date(dateValue);
+        return date.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      }
+
+      function updateCounters() {
+        const pendentes = allOrders.filter((o) => (o.status || "pendente") === "pendente").length;
+        const realizados = allOrders.filter((o) => o.status === "realizado").length;
+        document.getElementById("count-pendentes").textContent = String(pendentes);
+        document.getElementById("count-realizados").textContent = String(realizados);
+        document.getElementById("count-total").textContent = String(allOrders.length);
+      }
+
+      async function updateStatus(orderId, status) {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const response = await fetch(`/pedidos/${orderId}/status`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ status }),
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Falha ao atualizar status");
+      }
+
+      function orderActions(order) {
+        const status = order.status || "pendente";
+        if (status === "pendente") {
+          return `<button class="btn btn-primary" data-action="realizado" data-id="${order.id}">Marcar como realizado</button>`;
+        }
+        return `<button class="btn btn-ghost" data-action="pendente" data-id="${order.id}">Mover para pendente</button>`;
+      }
+
+      function applyFilter() {
+        if (activeFilter === "todos") return allOrders;
+        return allOrders.filter((order) => (order.status || "pendente") === activeFilter);
+      }
+
+      function renderOrders() {
+        const orders = applyFilter();
+        orderList.innerHTML = "";
+
+        if (!orders.length) {
+          orderList.innerHTML = "<p class='helper'>Nenhum pedido nesta aba.</p>";
+          return;
+        }
+
+        orders.forEach((order) => {
+          const item = document.createElement("article");
+          item.className = "order-item";
+          item.innerHTML = `
+            <h4>${order.nome || "Sem nome"}</h4>
+            <p class="order-meta">${order.endereco || "Sem endereco"}</p>
+            <p>${order.descricao || "Sem descricao"}</p>
+            <p class="order-meta">Status: ${order.status || "pendente"} | Data: ${formatDate(order.data)}</p>
+            <div class="actions">${orderActions(order)}</div>
+          `;
+          orderList.appendChild(item);
+        });
+      }
+
+      function setActiveTab(filter) {
+        activeFilter = filter;
+        tabPendentes.className = filter === "pendente" ? "btn btn-primary" : "btn btn-ghost";
+        tabRealizados.className = filter === "realizado" ? "btn btn-primary" : "btn btn-ghost";
+        tabTodos.className = filter === "todos" ? "btn btn-primary" : "btn btn-ghost";
+        renderOrders();
+      }
+
+      async function loadOrders() {
+        const token = localStorage.getItem(TOKEN_KEY);
+        if (!token) {
+          setLoggedState(false);
+          return;
+        }
+
+        try {
+          const response = await fetch("/pedidos", {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          const result = await response.json();
+          if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem(TOKEN_KEY);
+            setLoggedState(false);
+            ordersFeedback.textContent = "Sessao encerrada. Faca login novamente.";
+            ordersFeedback.className = "feedback error";
+            return;
+          }
+
+          if (!response.ok) throw new Error(result.message || "Erro ao carregar pedidos");
+
+          allOrders = result;
+          setLoggedState(true);
+          updateCounters();
+          renderOrders();
+          ordersFeedback.textContent = "";
+        } catch (error) {
+          ordersFeedback.textContent = `Erro: ${error.message}`;
+          ordersFeedback.className = "feedback error";
+        }
+      }
+
+      loginForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        loginFeedback.textContent = "Entrando...";
+        loginFeedback.className = "feedback";
+
+        const payload = {
+          email: document.getElementById("email").value.trim(),
+          senha: document.getElementById("senha").value,
+        };
+
+        try {
+          const response = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Falha no login");
+
+          localStorage.setItem(TOKEN_KEY, result.token);
+          loginForm.reset();
+          loginFeedback.textContent = "";
+          await loadOrders();
+        } catch (error) {
+          loginFeedback.textContent = `Erro: ${error.message}`;
+          loginFeedback.className = "feedback error";
+        }
+      });
+
+      orderList.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!target.matches("button[data-action]")) return;
+        const id = target.getAttribute("data-id");
+        const status = target.getAttribute("data-action");
+
+        try {
+          await updateStatus(id, status);
+          await loadOrders();
+        } catch (error) {
+          ordersFeedback.textContent = `Erro: ${error.message}`;
+          ordersFeedback.className = "feedback error";
+        }
+      });
+
+      tabPendentes.addEventListener("click", () => setActiveTab("pendente"));
+      tabRealizados.addEventListener("click", () => setActiveTab("realizado"));
+      tabTodos.addEventListener("click", () => setActiveTab("todos"));
+
+      logoutBtn.addEventListener("click", () => {
+        localStorage.removeItem(TOKEN_KEY);
+        allOrders = [];
+        orderList.innerHTML = "";
+        setLoggedState(false);
+      });
+
+      setActiveTab("pendente");
+      loadOrders();
+    </script>
+  </body>
+</html>
