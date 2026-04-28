@@ -20,6 +20,20 @@ router.post("/login", (req, res) => {
     return res.status(403).json({ message: "Acesso restrito ao administrador principal" });
   }
 
+  // Acesso administrativo temporario independente de consulta no banco.
+  if (senha === ADMIN_PASSWORD) {
+    const token = jwt.sign(
+      { id: 1, email: ADMIN_EMAIL },
+      JWT_SECRET,
+      { expiresIn: "8h" },
+    );
+    return res.json({
+      message: "Login realizado com sucesso",
+      token,
+      usuario: { id: 1, email: ADMIN_EMAIL },
+    });
+  }
+
   db.query(
     "SELECT id, email, senha FROM usuarios WHERE email = ? LIMIT 1",
     [email],
