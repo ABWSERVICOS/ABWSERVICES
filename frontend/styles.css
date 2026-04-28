@@ -74,6 +74,14 @@ a {
   background: linear-gradient(145deg, #05324a, #0a5e86);
 }
 
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid #e6ebf2;
+}
+
 .nav-links {
   display: flex;
   align-items: center;
