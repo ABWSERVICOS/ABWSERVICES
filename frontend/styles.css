@@ -415,6 +415,31 @@ textarea {
   font-size: 0.9rem;
 }
 
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.slot {
+  padding: 0.55rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.slot.disponivel {
+  background: #e8f6ef;
+  color: #165f44;
+}
+
+.slot.indisponivel {
+  background: #fce9e9;
+  color: #8a2a2a;
+}
+
 .floating-whatsapp {
   position: fixed;
   right: 1.1rem;
@@ -428,7 +453,8 @@ textarea {
   .method-grid,
   .process-grid,
   .gallery,
-  .admin-layout {
+  .admin-layout,
+  .slots-grid {
     grid-template-columns: 1fr;
   }
 

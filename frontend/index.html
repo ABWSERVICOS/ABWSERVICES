@@ -22,6 +22,7 @@
         <nav class="nav-links">
           <a href="#servicos">Servicos</a>
           <a href="#metodologia">Metodologia</a>
+          <a href="#agenda">Agenda</a>
           <a href="#avaliacoes">Avaliacoes</a>
           <a href="/orcamento.html">Orcamento</a>
         </nav>
@@ -46,12 +47,61 @@
               <a class="btn btn-primary" href="/orcamento.html">Solicitar Orcamento</a>
               <a class="btn btn-whatsapp" href="https://wa.me/message/J2J5IVGHGDWGC1" target="_blank" rel="noreferrer">Falar no WhatsApp</a>
             </div>
+            <p class="helper">Contato por email: abwservicos@gmail.com</p>
           </div>
           <div class="hero-visual">
             <img
               src="https://images.unsplash.com/photo-1621905252507-b35492cc74b4?auto=format&fit=crop&w=1200&q=80"
               alt="Prestador de servicos em atendimento"
             />
+          </div>
+        </div>
+      </section>
+
+      <section id="agenda" class="band band-surface">
+        <div class="container">
+          <div class="section-head">
+            <h2>Mini Agenda de Atendimento</h2>
+            <p>
+              Escolha uma data e horario disponivel para solicitar seu atendimento.
+            </p>
+          </div>
+          <div class="admin-layout">
+            <section class="panel">
+              <h3>Agendar horario</h3>
+              <form id="agenda-form" class="form-grid">
+                <div>
+                  <label for="ag-nome">Nome</label>
+                  <input id="ag-nome" type="text" required />
+                </div>
+                <div>
+                  <label for="ag-contato">Contato (WhatsApp)</label>
+                  <input id="ag-contato" type="text" required />
+                </div>
+                <div>
+                  <label for="ag-servico">Servico</label>
+                  <input id="ag-servico" type="text" required />
+                </div>
+                <div>
+                  <label for="ag-data">Data</label>
+                  <input id="ag-data" type="date" required />
+                </div>
+                <div>
+                  <label for="ag-hora">Horario</label>
+                  <select id="ag-hora" required></select>
+                </div>
+                <div>
+                  <label for="ag-obs">Observacoes</label>
+                  <textarea id="ag-obs"></textarea>
+                </div>
+                <button class="btn btn-primary" type="submit">Solicitar Agendamento</button>
+                <p id="agenda-feedback" class="feedback"></p>
+              </form>
+            </section>
+            <section class="panel">
+              <h3>Disponibilidade do dia</h3>
+              <div id="slots" class="slots-grid"></div>
+            </section>
           </div>
         </div>
       </section>
@@ -221,7 +271,10 @@
     <footer class="footer">
       <div class="container footer-row">
         <span>© <span id="ano"></span> ABW Marido de Aluguel. Todos os direitos reservados.</span>
-        <a class="btn btn-whatsapp" href="https://wa.me/message/J2J5IVGHGDWGC1" target="_blank" rel="noreferrer">Atendimento via WhatsApp</a>
+        <div class="actions">
+          <a class="btn btn-whatsapp" href="https://wa.me/message/J2J5IVGHGDWGC1" target="_blank" rel="noreferrer">Atendimento via WhatsApp</a>
+          <a class="btn btn-ghost" href="mailto:abwservicos@gmail.com">abwservicos@gmail.com</a>
+        </div>
       </div>
     </footer>
 
@@ -233,6 +286,11 @@
       const formAvaliacao = document.getElementById("avaliacao-form");
       const feedbackAvaliacao = document.getElementById("avaliacao-feedback");
       const listaAvaliacoes = document.getElementById("lista-avaliacoes");
+      const agendaForm = document.getElementById("agenda-form");
+      const agendaFeedback = document.getElementById("agenda-feedback");
+      const slots = document.getElementById("slots");
+      const agData = document.getElementById("ag-data");
+      const agHora = document.getElementById("ag-hora");
 
       function estrelas(nota) {
         return "★".repeat(nota) + "☆".repeat(5 - nota);
@@ -294,6 +352,73 @@
       });
 
       carregarAvaliacoes();
+
+      function renderSlots(horarios) {
+        slots.innerHTML = "";
+        agHora.innerHTML = "";
+        horarios.forEach((item) => {
+          const div = document.createElement("div");
+          div.className = `slot ${item.disponivel ? "disponivel" : "indisponivel"}`;
+          div.textContent = `${item.hora} - ${item.disponivel ? "Disponivel" : "Indisponivel"}`;
+          slots.appendChild(div);
+
+          if (item.disponivel) {
+            const option = document.createElement("option");
+            option.value = item.hora;
+            option.textContent = item.hora;
+            agHora.appendChild(option);
+          }
+        });
+      }
+
+      async function carregarDisponibilidade() {
+        if (!agData.value) return;
+        const response = await fetch(`/agenda/disponibilidade?data=${agData.value}`);
+        const result = await response.json();
+        if (!response.ok) {
+          agendaFeedback.textContent = result.message || "Erro ao carregar agenda";
+          agendaFeedback.className = "feedback error";
+          return;
+        }
+        renderSlots(result.horarios);
+      }
+
+      agData.addEventListener("change", carregarDisponibilidade);
+
+      agendaForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        agendaFeedback.textContent = "Enviando agendamento...";
+        agendaFeedback.className = "feedback";
+
+        const payload = {
+          nome: document.getElementById("ag-nome").value.trim(),
+          contato: document.getElementById("ag-contato").value.trim(),
+          servico: document.getElementById("ag-servico").value.trim(),
+          data: agData.value,
+          hora: agHora.value,
+          observacoes: document.getElementById("ag-obs").value.trim(),
+        };
+
+        try {
+          const response = await fetch("/agenda/agendar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Erro ao agendar");
+
+          agendaFeedback.textContent = "Horario solicitado com sucesso.";
+          agendaFeedback.className = "feedback ok";
+          agendaForm.reset();
+          agHora.innerHTML = "";
+          slots.innerHTML = "";
+        } catch (error) {
+          agendaFeedback.textContent = `Erro: ${error.message}`;
+          agendaFeedback.className = "feedback error";
+          await carregarDisponibilidade();
+        }
+      });
     </script>
   </body>
 </html>

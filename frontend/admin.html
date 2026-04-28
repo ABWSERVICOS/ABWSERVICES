@@ -33,6 +33,7 @@
           <p class="helper">
             Apenas o administrador principal tem acesso a este painel.
           </p>
+          <p class="helper">Login atual: abwservicos@gmail.com | Senha temporaria: 123456</p>
           <form id="login-form" class="form-grid">
             <div>
               <label for="email">Email do administrador</label>
@@ -72,6 +73,41 @@
             <p id="orders-feedback" class="feedback"></p>
             <div id="order-list" class="order-list"></div>
           </section>
+
+          <section class="panel">
+            <h3>Manutencao da Agenda</h3>
+            <div class="admin-layout">
+              <section class="panel">
+                <h4>Bloquear horario</h4>
+                <form id="bloqueio-form" class="form-grid">
+                  <div>
+                    <label for="bloq-data">Data</label>
+                    <input id="bloq-data" type="date" required />
+                  </div>
+                  <div>
+                    <label for="bloq-hora">Hora</label>
+                    <input id="bloq-hora" type="time" required />
+                  </div>
+                  <div>
+                    <label for="bloq-motivo">Motivo</label>
+                    <input id="bloq-motivo" type="text" />
+                  </div>
+                  <button class="btn btn-primary" type="submit">Bloquear</button>
+                  <p id="agenda-feedback" class="feedback"></p>
+                </form>
+              </section>
+              <section class="panel">
+                <h4>Agendamentos dos clientes</h4>
+                <div class="actions">
+                  <button id="ag-tab-pendente" type="button" class="btn btn-primary">Pendentes</button>
+                  <button id="ag-tab-todos" type="button" class="btn btn-ghost">Todos</button>
+                </div>
+                <div id="ag-lista" class="order-list"></div>
+              </section>
+            </div>
+            <h4>Horarios bloqueados</h4>
+            <div id="bloq-lista" class="order-list"></div>
+          </section>
         </section>
       </div>
     </main>
@@ -88,6 +124,13 @@
       const loginFeedback = document.getElementById("login-feedback");
       const ordersFeedback = document.getElementById("orders-feedback");
       const orderList = document.getElementById("order-list");
+      const bloqueioForm = document.getElementById("bloqueio-form");
+      const agendaFeedback = document.getElementById("agenda-feedback");
+      const agLista = document.getElementById("ag-lista");
+      const bloqLista = document.getElementById("bloq-lista");
+      const agTabPendente = document.getElementById("ag-tab-pendente");
+      const agTabTodos = document.getElementById("ag-tab-todos");
+      let agendaFilter = "pendente";
 
       const tabPendentes = document.getElementById("tab-pendentes");
       const tabRealizados = document.getElementById("tab-realizados");
@@ -209,6 +252,72 @@
         }
       }
 
+      async function authFetch(url, options = {}) {
+        const token = localStorage.getItem(TOKEN_KEY);
+        const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+        return fetch(url, { ...options, headers });
+      }
+
+      function renderAgendamentos(lista) {
+        agLista.innerHTML = "";
+        if (!lista.length) {
+          agLista.innerHTML = "<p class='helper'>Nenhum agendamento nesta visualizacao.</p>";
+          return;
+        }
+
+        lista.forEach((item) => {
+          const card = document.createElement("article");
+          card.className = "order-item";
+          card.innerHTML = `
+            <h4>${item.nome}</h4>
+            <p class="order-meta">${item.data} ${item.hora} | ${item.contato}</p>
+            <p>${item.servico}</p>
+            <p>${item.observacoes || ""}</p>
+            <p class="order-meta">Status: ${item.status}</p>
+            <div class="actions">
+              <button class="btn btn-primary" data-ag-action="confirmado" data-ag-id="${item.id}">Confirmar</button>
+              <button class="btn btn-ghost" data-ag-action="realizado" data-ag-id="${item.id}">Realizado</button>
+              <button class="btn btn-ghost" data-ag-action="cancelado" data-ag-id="${item.id}">Cancelar</button>
+            </div>
+          `;
+          agLista.appendChild(card);
+        });
+      }
+
+      function renderBloqueios(lista) {
+        bloqLista.innerHTML = "";
+        if (!lista.length) {
+          bloqLista.innerHTML = "<p class='helper'>Nenhum horario bloqueado.</p>";
+          return;
+        }
+        lista.forEach((b) => {
+          const card = document.createElement("article");
+          card.className = "order-item";
+          card.innerHTML = `
+            <h4>${b.data} ${b.hora}</h4>
+            <p class="order-meta">${b.motivo || "Indisponivel"}</p>
+            <button class="btn btn-ghost" data-bloq-id="${b.id}">Remover bloqueio</button>
+          `;
+          bloqLista.appendChild(card);
+        });
+      }
+
+      async function loadAgenda() {
+        const url = agendaFilter === "todos"
+          ? "/agenda/admin/agendamentos"
+          : `/agenda/admin/agendamentos?status=${agendaFilter}`;
+        const [agRes, blRes] = await Promise.all([
+          authFetch(url),
+          authFetch("/agenda/admin/bloqueios"),
+        ]);
+        const agData = await agRes.json();
+        const blData = await blRes.json();
+        if (!agRes.ok) throw new Error(agData.message || "Erro ao carregar agenda");
+        if (!blRes.ok) throw new Error(blData.message || "Erro ao carregar bloqueios");
+        renderAgendamentos(agData);
+        renderBloqueios(blData);
+      }
+
       loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         loginFeedback.textContent = "Entrando...";
@@ -233,10 +342,87 @@
           loginForm.reset();
           loginFeedback.textContent = "";
           await loadOrders();
+          await loadAgenda();
         } catch (error) {
           loginFeedback.textContent = `Erro: ${error.message}`;
           loginFeedback.className = "feedback error";
         }
+      });
+
+      bloqueioForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        agendaFeedback.textContent = "Bloqueando horario...";
+        agendaFeedback.className = "feedback";
+        const payload = {
+          data: document.getElementById("bloq-data").value,
+          hora: document.getElementById("bloq-hora").value,
+          motivo: document.getElementById("bloq-motivo").value.trim(),
+        };
+        try {
+          const response = await authFetch("/agenda/admin/bloqueios", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Erro ao bloquear");
+          agendaFeedback.textContent = "Horario bloqueado.";
+          agendaFeedback.className = "feedback ok";
+          bloqueioForm.reset();
+          await loadAgenda();
+        } catch (error) {
+          agendaFeedback.textContent = `Erro: ${error.message}`;
+          agendaFeedback.className = "feedback error";
+        }
+      });
+
+      agLista.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!target.matches("button[data-ag-action]")) return;
+        const id = target.getAttribute("data-ag-id");
+        const status = target.getAttribute("data-ag-action");
+        try {
+          const response = await authFetch(`/agenda/admin/agendamentos/${id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ status }),
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Erro ao atualizar");
+          await loadAgenda();
+        } catch (error) {
+          agendaFeedback.textContent = `Erro: ${error.message}`;
+          agendaFeedback.className = "feedback error";
+        }
+      });
+
+      bloqLista.addEventListener("click", async (event) => {
+        const target = event.target;
+        if (!target.matches("button[data-bloq-id]")) return;
+        const id = target.getAttribute("data-bloq-id");
+        try {
+          const response = await authFetch(`/agenda/admin/bloqueios/${id}`, { method: "DELETE" });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || "Erro ao remover bloqueio");
+          await loadAgenda();
+        } catch (error) {
+          agendaFeedback.textContent = `Erro: ${error.message}`;
+          agendaFeedback.className = "feedback error";
+        }
+      });
+
+      agTabPendente.addEventListener("click", async () => {
+        agendaFilter = "pendente";
+        agTabPendente.className = "btn btn-primary";
+        agTabTodos.className = "btn btn-ghost";
+        await loadAgenda();
+      });
+
+      agTabTodos.addEventListener("click", async () => {
+        agendaFilter = "todos";
+        agTabPendente.className = "btn btn-ghost";
+        agTabTodos.className = "btn btn-primary";
+        await loadAgenda();
       });
 
       orderList.addEventListener("click", async (event) => {
@@ -267,6 +453,7 @@
 
       setActiveTab("pendente");
       loadOrders();
+      loadAgenda().catch(() => {});
     </script>
   </body>
 </html>
