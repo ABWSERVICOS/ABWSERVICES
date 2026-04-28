@@ -30,9 +30,7 @@
       <div class="container">
         <div class="section-head">
           <h1>Solicitar Orçamento</h1>
-          <p>
-            Preencha os dados abaixo e nossa equipe retorna com a proposta.
-          </p>
+          <p>Preencha os dados abaixo e nossa equipe retorna com a proposta.</p>
         </div>
 
         <section class="panel">
@@ -49,7 +47,9 @@
               <label for="descricao">Descreva o serviço</label>
               <textarea id="descricao" required></textarea>
             </div>
-            <button class="btn btn-primary" type="submit">Enviar Solicitação</button>
+            <button class="btn btn-primary" type="submit">
+              Enviar Solicitação
+            </button>
             <p id="feedback" class="feedback"></p>
           </form>
         </section>
@@ -65,6 +65,14 @@
 
         feedback.textContent = "Enviando solicitação...";
         feedback.className = "feedback";
+
+        const inputData = document.getElementById("data-agenda");
+
+        if (inputData) {
+          inputData.addEventListener("change", (e) => {
+            carregarDisponibilidade(e.target.value);
+          });
+        }
 
         const data = {
           nome: document.getElementById("nome").value.trim(),
@@ -85,7 +93,8 @@
           }
 
           form.reset();
-          feedback.textContent = result.mensagem || "Solicitação enviada com sucesso.";
+          feedback.textContent =
+            result.mensagem || "Solicitação enviada com sucesso.";
           feedback.className = "feedback ok";
         } catch (error) {
           feedback.textContent = `Erro: ${error.message}`;

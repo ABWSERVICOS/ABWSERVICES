@@ -21,7 +21,9 @@
         </a>
         <div class="actions">
           <a class="btn btn-ghost" href="/">Voltar ao Site</a>
-          <button id="logout-btn" class="btn btn-primary hidden" type="button">Sair</button>
+          <button id="logout-btn" class="btn btn-primary hidden" type="button">
+            Sair
+          </button>
         </div>
       </div>
     </header>
@@ -42,7 +44,9 @@
               <label for="senha">Senha</label>
               <input type="password" id="senha" required />
             </div>
-            <button class="btn btn-primary" type="submit">Entrar no painel</button>
+            <button class="btn btn-primary" type="submit">
+              Entrar no painel
+            </button>
             <p id="login-feedback" class="feedback"></p>
           </form>
         </section>
@@ -65,9 +69,15 @@
 
           <section class="panel">
             <div class="actions">
-              <button id="tab-pendentes" class="btn btn-primary" type="button">Pendentes</button>
-              <button id="tab-realizados" class="btn btn-ghost" type="button">Realizados</button>
-              <button id="tab-todos" class="btn btn-ghost" type="button">Todos</button>
+              <button id="tab-pendentes" class="btn btn-primary" type="button">
+                Pendentes
+              </button>
+              <button id="tab-realizados" class="btn btn-ghost" type="button">
+                Realizados
+              </button>
+              <button id="tab-todos" class="btn btn-ghost" type="button">
+                Todos
+              </button>
             </div>
             <p id="orders-feedback" class="feedback"></p>
             <div id="order-list" class="order-list"></div>
@@ -91,15 +101,30 @@
                     <label for="bloq-motivo">Motivo</label>
                     <input id="bloq-motivo" type="text" />
                   </div>
-                  <button class="btn btn-primary" type="submit">Bloquear</button>
+                  <button class="btn btn-primary" type="submit">
+                    Bloquear
+                  </button>
                   <p id="agenda-feedback" class="feedback"></p>
                 </form>
               </section>
               <section class="panel">
                 <h4>Agendamentos dos clientes</h4>
                 <div class="actions">
-                  <button id="ag-tab-pendente" type="button" class="btn btn-primary">Pendentes</button>
-                  <button id="ag-tab-todos" type="button" class="btn btn-ghost">Todos</button>
+                  <button
+                    id="ag-tab-pendente"
+                    type="button"
+                    class="btn btn-primary"
+                  >
+                    <h4>Ver disponibilidade</h4>
+
+                    <input type="date" id="data-agenda" />
+
+                    <div id="horarios" style="margin-top: 10px"></div>
+                    Pendentes
+                  </button>
+                  <button id="ag-tab-todos" type="button" class="btn btn-ghost">
+                    Todos
+                  </button>
                 </div>
                 <div id="ag-lista" class="order-list"></div>
               </section>
@@ -152,11 +177,19 @@
       }
 
       function updateCounters() {
-        const pendentes = allOrders.filter((o) => (o.status || "pendente") === "pendente").length;
-        const realizados = allOrders.filter((o) => o.status === "realizado").length;
-        document.getElementById("count-pendentes").textContent = String(pendentes);
-        document.getElementById("count-realizados").textContent = String(realizados);
-        document.getElementById("count-total").textContent = String(allOrders.length);
+        const pendentes = allOrders.filter(
+          (o) => (o.status || "pendente") === "pendente",
+        ).length;
+        const realizados = allOrders.filter(
+          (o) => o.status === "realizado",
+        ).length;
+        document.getElementById("count-pendentes").textContent =
+          String(pendentes);
+        document.getElementById("count-realizados").textContent =
+          String(realizados);
+        document.getElementById("count-total").textContent = String(
+          allOrders.length,
+        );
       }
 
       async function updateStatus(orderId, status) {
@@ -170,9 +203,40 @@
           body: JSON.stringify({ status }),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Falha ao atualizar status");
+        if (!response.ok)
+          throw new Error(result.message || "Falha ao atualizar status");
+      }
+      async function carregarDisponibilidade(data) {
+        try {
+          const response = await fetch(
+            `http://localhost:3001/agenda/disponibilidade?data=${data}`,
+          );
+          const result = await response.json();
+
+          if (!response.ok) throw new Error(result.message);
+
+          mostrarHorarios(result.horarios);
+        } catch (error) {
+          console.error("Erro ao carregar horários:", error.message);
+        }
       }
 
+      function mostrarHorarios(horarios) {
+        const container = document.getElementById("horarios");
+        container.innerHTML = "";
+
+        horarios.forEach((h) => {
+          const btn = document.createElement("button");
+          btn.textContent = h.hora;
+          btn.disabled = !h.disponivel;
+
+          btn.onclick = () => {
+            alert("Você escolheu: " + h.hora);
+          };
+
+          container.appendChild(btn);
+        });
+      }
       function orderActions(order) {
         const status = order.status || "pendente";
         if (status === "pendente") {
@@ -183,7 +247,9 @@
 
       function applyFilter() {
         if (activeFilter === "todos") return allOrders;
-        return allOrders.filter((order) => (order.status || "pendente") === activeFilter);
+        return allOrders.filter(
+          (order) => (order.status || "pendente") === activeFilter,
+        );
       }
 
       function renderOrders() {
@@ -191,7 +257,8 @@
         orderList.innerHTML = "";
 
         if (!orders.length) {
-          orderList.innerHTML = "<p class='helper'>Nenhum pedido nesta aba.</p>";
+          orderList.innerHTML =
+            "<p class='helper'>Nenhum pedido nesta aba.</p>";
           return;
         }
 
@@ -211,9 +278,12 @@
 
       function setActiveTab(filter) {
         activeFilter = filter;
-        tabPendentes.className = filter === "pendente" ? "btn btn-primary" : "btn btn-ghost";
-        tabRealizados.className = filter === "realizado" ? "btn btn-primary" : "btn btn-ghost";
-        tabTodos.className = filter === "todos" ? "btn btn-primary" : "btn btn-ghost";
+        tabPendentes.className =
+          filter === "pendente" ? "btn btn-primary" : "btn btn-ghost";
+        tabRealizados.className =
+          filter === "realizado" ? "btn btn-primary" : "btn btn-ghost";
+        tabTodos.className =
+          filter === "todos" ? "btn btn-primary" : "btn btn-ghost";
         renderOrders();
       }
 
@@ -233,12 +303,14 @@
           if (response.status === 401 || response.status === 403) {
             localStorage.removeItem(TOKEN_KEY);
             setLoggedState(false);
-            ordersFeedback.textContent = "Sessao encerrada. Faca login novamente.";
+            ordersFeedback.textContent =
+              "Sessao encerrada. Faca login novamente.";
             ordersFeedback.className = "feedback error";
             return;
           }
 
-          if (!response.ok) throw new Error(result.message || "Erro ao carregar pedidos");
+          if (!response.ok)
+            throw new Error(result.message || "Erro ao carregar pedidos");
 
           allOrders = result;
           setLoggedState(true);
@@ -253,14 +325,18 @@
 
       async function authFetch(url, options = {}) {
         const token = localStorage.getItem(TOKEN_KEY);
-        const headers = { ...(options.headers || {}), Authorization: `Bearer ${token}` };
+        const headers = {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${token}`,
+        };
         return fetch(url, { ...options, headers });
       }
 
       function renderAgendamentos(lista) {
         agLista.innerHTML = "";
         if (!lista.length) {
-          agLista.innerHTML = "<p class='helper'>Nenhum agendamento nesta visualizacao.</p>";
+          agLista.innerHTML =
+            "<p class='helper'>Nenhum agendamento nesta visualizacao.</p>";
           return;
         }
 
@@ -286,7 +362,8 @@
       function renderBloqueios(lista) {
         bloqLista.innerHTML = "";
         if (!lista.length) {
-          bloqLista.innerHTML = "<p class='helper'>Nenhum horario bloqueado.</p>";
+          bloqLista.innerHTML =
+            "<p class='helper'>Nenhum horario bloqueado.</p>";
           return;
         }
         lista.forEach((b) => {
@@ -302,17 +379,20 @@
       }
 
       async function loadAgenda() {
-        const url = agendaFilter === "todos"
-          ? "/agenda/admin/agendamentos"
-          : `/agenda/admin/agendamentos?status=${agendaFilter}`;
+        const url =
+          agendaFilter === "todos"
+            ? "/agenda/admin/agendamentos"
+            : `/agenda/admin/agendamentos?status=${agendaFilter}`;
         const [agRes, blRes] = await Promise.all([
           authFetch(url),
           authFetch("/agenda/admin/bloqueios"),
         ]);
         const agData = await agRes.json();
         const blData = await blRes.json();
-        if (!agRes.ok) throw new Error(agData.message || "Erro ao carregar agenda");
-        if (!blRes.ok) throw new Error(blData.message || "Erro ao carregar bloqueios");
+        if (!agRes.ok)
+          throw new Error(agData.message || "Erro ao carregar agenda");
+        if (!blRes.ok)
+          throw new Error(blData.message || "Erro ao carregar bloqueios");
         renderAgendamentos(agData);
         renderBloqueios(blData);
       }
@@ -364,7 +444,8 @@
             body: JSON.stringify(payload),
           });
           const result = await response.json();
-          if (!response.ok) throw new Error(result.message || "Erro ao bloquear");
+          if (!response.ok)
+            throw new Error(result.message || "Erro ao bloquear");
           agendaFeedback.textContent = "Horario bloqueado.";
           agendaFeedback.className = "feedback ok";
           bloqueioForm.reset();
@@ -381,13 +462,17 @@
         const id = target.getAttribute("data-ag-id");
         const status = target.getAttribute("data-ag-action");
         try {
-          const response = await authFetch(`/agenda/admin/agendamentos/${id}/status`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ status }),
-          });
+          const response = await authFetch(
+            `/agenda/admin/agendamentos/${id}/status`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status }),
+            },
+          );
           const result = await response.json();
-          if (!response.ok) throw new Error(result.message || "Erro ao atualizar");
+          if (!response.ok)
+            throw new Error(result.message || "Erro ao atualizar");
           await loadAgenda();
         } catch (error) {
           agendaFeedback.textContent = `Erro: ${error.message}`;
@@ -400,9 +485,12 @@
         if (!target.matches("button[data-bloq-id]")) return;
         const id = target.getAttribute("data-bloq-id");
         try {
-          const response = await authFetch(`/agenda/admin/bloqueios/${id}`, { method: "DELETE" });
+          const response = await authFetch(`/agenda/admin/bloqueios/${id}`, {
+            method: "DELETE",
+          });
           const result = await response.json();
-          if (!response.ok) throw new Error(result.message || "Erro ao remover bloqueio");
+          if (!response.ok)
+            throw new Error(result.message || "Erro ao remover bloqueio");
           await loadAgenda();
         } catch (error) {
           agendaFeedback.textContent = `Erro: ${error.message}`;
@@ -439,6 +527,38 @@
         }
       });
 
+      async function carregarDisponibilidade(data) {
+        try {
+          const response = await fetch(`/agenda/disponibilidade?data=${data}`);
+          const result = await response.json();
+
+          if (!response.ok) throw new Error(result.message);
+
+          console.log("HORÁRIOS:", result);
+
+          mostrarHorarios(result.horarios);
+        } catch (error) {
+          console.error("Erro ao carregar horários:", error.message);
+        }
+      }
+
+      function mostrarHorarios(horarios) {
+        const container = document.getElementById("horarios");
+
+        if (!container) return;
+
+        container.innerHTML = "";
+
+        horarios.forEach((h) => {
+          const btn = document.createElement("button");
+          btn.textContent = h.hora;
+          btn.disabled = !h.disponivel;
+
+          btn.className = h.disponivel ? "btn btn-primary" : "btn btn-ghost";
+
+          container.appendChild(btn);
+        });
+      }
       tabPendentes.addEventListener("click", () => setActiveTab("pendente"));
       tabRealizados.addEventListener("click", () => setActiveTab("realizado"));
       tabTodos.addEventListener("click", () => setActiveTab("todos"));
