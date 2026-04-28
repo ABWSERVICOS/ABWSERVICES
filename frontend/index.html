@@ -356,6 +356,7 @@
       function renderSlots(horarios) {
         slots.innerHTML = "";
         agHora.innerHTML = "";
+        let quantidadeDisponivel = 0;
         horarios.forEach((item) => {
           const div = document.createElement("div");
           div.className = `slot ${item.disponivel ? "disponivel" : "indisponivel"}`;
@@ -363,12 +364,20 @@
           slots.appendChild(div);
 
           if (item.disponivel) {
+            quantidadeDisponivel += 1;
             const option = document.createElement("option");
             option.value = item.hora;
             option.textContent = item.hora;
             agHora.appendChild(option);
           }
         });
+
+        if (quantidadeDisponivel === 0) {
+          const option = document.createElement("option");
+          option.value = "";
+          option.textContent = "Sem horarios disponiveis";
+          agHora.appendChild(option);
+        }
       }
 
       async function carregarDisponibilidade() {
@@ -384,6 +393,14 @@
       }
 
       agData.addEventListener("change", carregarDisponibilidade);
+      if (!agData.value) {
+        const hoje = new Date();
+        const yyyy = hoje.getFullYear();
+        const mm = String(hoje.getMonth() + 1).padStart(2, "0");
+        const dd = String(hoje.getDate()).padStart(2, "0");
+        agData.value = `${yyyy}-${mm}-${dd}`;
+      }
+      carregarDisponibilidade();
 
       agendaForm.addEventListener("submit", async (event) => {
         event.preventDefault();

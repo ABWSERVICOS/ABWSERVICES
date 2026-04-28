@@ -8,6 +8,7 @@ const { JWT_SECRET } = require("../middleware/auth");
 const router = express.Router();
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "abwservicos@gmail.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "123456";
+const ADMIN_EMAIL_FALLBACK = "abwservicos@gmail.com";
 
 router.post("/login", (req, res) => {
   const { email, senha } = req.body;
@@ -16,7 +17,9 @@ router.post("/login", (req, res) => {
     return res.status(400).json({ message: "Email e senha sao obrigatorios" });
   }
 
-  if (email.trim().toLowerCase() !== ADMIN_EMAIL.toLowerCase()) {
+  const emailNormalizado = email.trim().toLowerCase();
+  const emailsPermitidos = [ADMIN_EMAIL.toLowerCase(), ADMIN_EMAIL_FALLBACK];
+  if (!emailsPermitidos.includes(emailNormalizado)) {
     return res.status(403).json({ message: "Acesso restrito ao administrador principal" });
   }
 
