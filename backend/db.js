@@ -1,16 +1,16 @@
-// db.js
 const mysql = require("mysql2");
 
 const connection = mysql.createConnection({
-  host: "localhost",
-  user: "root",
-  password: "M@cieira22",
-  database: "servicos",
+  host: process.env.DB_HOST || "localhost",
+  port: Number(process.env.DB_PORT || 3306),
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "servicos",
 });
 
 connection.connect((err) => {
   if (err) {
-    console.error("Erro ao conectar:", err);
+    console.error("Erro ao conectar no MySQL:", err.message);
   } else {
     console.log("Conectado ao MySQL");
   }
