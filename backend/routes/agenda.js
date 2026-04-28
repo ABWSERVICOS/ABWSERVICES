@@ -21,29 +21,38 @@ const HORARIOS_PADRAO = [
   "20:00",
 ];
 
-db.query(`
-  CREATE TABLE IF NOT EXISTS agenda_agendamentos (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nome VARCHAR(120) NOT NULL,
-    contato VARCHAR(120) NOT NULL,
-    servico VARCHAR(150) NOT NULL,
-    data DATE NOT NULL,
-    hora VARCHAR(5) NOT NULL,
-    observacoes TEXT,
-    status VARCHAR(30) DEFAULT 'pendente',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
-`);
-
-db.query(`
-  CREATE TABLE IF NOT EXISTS agenda_bloqueios (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    data DATE NOT NULL,
-    hora VARCHAR(5) NOT NULL,
-    motivo VARCHAR(180),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+function ensureAgendaTables(callback) {
+  db.query(
+    `
+    CREATE TABLE IF NOT EXISTS agenda_agendamentos (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      nome VARCHAR(120) NOT NULL,
+      contato VARCHAR(120) NOT NULL,
+      servico VARCHAR(150) NOT NULL,
+      data DATE NOT NULL,
+      hora VARCHAR(5) NOT NULL,
+      observacoes TEXT,
+      status VARCHAR(30) DEFAULT 'pendente',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    `,
+    (err) => {
+      if (err) return callback(err);
+      return db.query(
+        `
+        CREATE TABLE IF NOT EXISTS agenda_bloqueios (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          data DATE NOT NULL,
+          hora VARCHAR(5) NOT NULL,
+          motivo VARCHAR(180),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        `,
+        (err2) => callback(err2),
+      );
+    },
+  );
+}
 
 function validarDataHora(data, hora) {
   const dataValida = /^\d{4}-\d{2}-\d{2}$/.test(data || "");
@@ -74,24 +83,29 @@ router.get("/disponibilidade", (req, res) => {
     return res.status(400).json({ message: "Data invalida. Use YYYY-MM-DD" });
   }
 
-  db.query(
-    `
-      SELECT hora, 'bloqueado' AS origem FROM agenda_bloqueios WHERE data = ?
-      UNION ALL
-      SELECT hora, 'agendado' AS origem FROM agenda_agendamentos
-      WHERE data = ? AND status IN ('pendente', 'confirmado')
-    `,
-    [data, data],
-    (err, rows) => {
-      if (err) return res.status(500).json({ message: "Erro ao carregar disponibilidade" });
-      const indisponiveis = new Set(rows.map((r) => r.hora));
-      const horarios = HORARIOS_PADRAO.map((hora) => ({
-        hora,
-        disponivel: !indisponiveis.has(hora),
-      }));
-      return res.json({ data, horarios });
-    },
-  );
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+    return db.query(
+      `
+        SELECT hora, 'bloqueado' AS origem FROM agenda_bloqueios WHERE data = ?
+        UNION ALL
+        SELECT hora, 'agendado' AS origem FROM agenda_agendamentos
+        WHERE data = ? AND status IN ('pendente', 'confirmado')
+      `,
+      [data, data],
+      (err, rows) => {
+        if (err) return res.status(500).json({ message: "Erro ao carregar disponibilidade", detail: err.sqlMessage || err.message });
+        const indisponiveis = new Set(rows.map((r) => r.hora));
+        const horarios = HORARIOS_PADRAO.map((hora) => ({
+          hora,
+          disponivel: !indisponiveis.has(hora),
+        }));
+        return res.json({ data, horarios });
+      },
+    );
+  });
 });
 
 router.post("/agendar", (req, res) => {
@@ -100,7 +114,12 @@ router.post("/agendar", (req, res) => {
     return res.status(400).json({ message: "Preencha nome, contato, servico, data e horario validos" });
   }
 
-  slotDisponivel(data, hora, (checkErr, livre) => {
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+
+    return slotDisponivel(data, hora, (checkErr, livre) => {
     if (checkErr) return res.status(500).json({ message: "Erro ao validar disponibilidade" });
     if (!livre) {
       return res.status(409).json({ message: "Este horario nao esta disponivel" });
@@ -117,6 +136,7 @@ router.post("/agendar", (req, res) => {
         return res.json({ message: "Horario reservado com sucesso" });
       },
     );
+    });
   });
 });
 
@@ -132,9 +152,15 @@ router.get("/admin/agendamentos", authMiddleware, (req, res) => {
 
   sql += " ORDER BY data ASC, hora ASC";
 
-  db.query(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ message: "Erro ao carregar agendamentos" });
-    return res.json(rows);
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+
+    return db.query(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ message: "Erro ao carregar agendamentos", detail: err.sqlMessage || err.message });
+      return res.json(rows);
+    });
   });
 });
 
@@ -146,21 +172,32 @@ router.patch("/admin/agendamentos/:id/status", authMiddleware, (req, res) => {
     return res.status(400).json({ message: "Status invalido" });
   }
 
-  db.query(
-    "UPDATE agenda_agendamentos SET status = ? WHERE id = ?",
-    [status, id],
-    (err, result) => {
-      if (err) return res.status(500).json({ message: "Erro ao atualizar agendamento" });
-      if (!result.affectedRows) return res.status(404).json({ message: "Agendamento nao encontrado" });
-      return res.json({ message: "Status atualizado" });
-    },
-  );
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+
+    return db.query(
+      "UPDATE agenda_agendamentos SET status = ? WHERE id = ?",
+      [status, id],
+      (err, result) => {
+        if (err) return res.status(500).json({ message: "Erro ao atualizar agendamento", detail: err.sqlMessage || err.message });
+        if (!result.affectedRows) return res.status(404).json({ message: "Agendamento nao encontrado" });
+        return res.json({ message: "Status atualizado" });
+      },
+    );
+  });
 });
 
 router.get("/admin/bloqueios", authMiddleware, (req, res) => {
-  db.query("SELECT * FROM agenda_bloqueios ORDER BY data ASC, hora ASC", (err, rows) => {
-    if (err) return res.status(500).json({ message: "Erro ao carregar bloqueios" });
-    return res.json(rows);
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+    return db.query("SELECT * FROM agenda_bloqueios ORDER BY data ASC, hora ASC", (err, rows) => {
+      if (err) return res.status(500).json({ message: "Erro ao carregar bloqueios", detail: err.sqlMessage || err.message });
+      return res.json(rows);
+    });
   });
 });
 
@@ -170,21 +207,32 @@ router.post("/admin/bloqueios", authMiddleware, (req, res) => {
     return res.status(400).json({ message: "Data/hora invalidas" });
   }
 
-  db.query(
-    "INSERT INTO agenda_bloqueios (data, hora, motivo) VALUES (?, ?, ?)",
-    [data, hora, motivo || "Indisponivel"],
-    (err) => {
-      if (err) return res.status(500).json({ message: "Erro ao bloquear horario" });
-      return res.json({ message: "Horario bloqueado" });
-    },
-  );
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+
+    return db.query(
+      "INSERT INTO agenda_bloqueios (data, hora, motivo) VALUES (?, ?, ?)",
+      [data, hora, motivo || "Indisponivel"],
+      (err) => {
+        if (err) return res.status(500).json({ message: "Erro ao bloquear horario", detail: err.sqlMessage || err.message });
+        return res.json({ message: "Horario bloqueado" });
+      },
+    );
+  });
 });
 
 router.delete("/admin/bloqueios/:id", authMiddleware, (req, res) => {
-  db.query("DELETE FROM agenda_bloqueios WHERE id = ?", [req.params.id], (err, result) => {
-    if (err) return res.status(500).json({ message: "Erro ao remover bloqueio" });
-    if (!result.affectedRows) return res.status(404).json({ message: "Bloqueio nao encontrado" });
-    return res.json({ message: "Bloqueio removido" });
+  ensureAgendaTables((tableErr) => {
+    if (tableErr) {
+      return res.status(500).json({ message: "Erro ao preparar agenda", detail: tableErr.sqlMessage || tableErr.message });
+    }
+    return db.query("DELETE FROM agenda_bloqueios WHERE id = ?", [req.params.id], (err, result) => {
+      if (err) return res.status(500).json({ message: "Erro ao remover bloqueio", detail: err.sqlMessage || err.message });
+      if (!result.affectedRows) return res.status(404).json({ message: "Bloqueio nao encontrado" });
+      return res.json({ message: "Bloqueio removido" });
+    });
   });
 });
 
